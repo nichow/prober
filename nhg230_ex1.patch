@@ -1,0 +1,86 @@
+diff --git a/ex1/README.txt b/ex1/README.txt
+index 87351ab..e38f53c 100644
+--- a/ex1/README.txt
++++ b/ex1/README.txt
+@@ -1,5 +1,15 @@
+-TODO: Describe how to build your prober.
++proper.py -- My dyslexia kicked in and I completely bungled the spelling of prober, 
++I thought it was funny so I kept it
+ 
+-TODO: Describe how to run your prober.
++program is a python 3.6 script and need not be built, but requires python 3 as well as the requests library
++requests is installed with the following: pip3 install requests
+ 
+-TODO: Describe how you prober handles HTTP redirects.
++the program is run from the command line with two arguments: the url 
++formatted properly with the scheme (i.e. http:// or https://) as well as 
++the specified file to write to
++
++the program requires the default port of 80. 
++
++The program uses the Requests python library (http://docs.python-requests.org/en/master/)
++this library by default resolves internal redirect (307) responses. I kept this behavior in,
++so internal redirects will resolve and the program will write a 200 response to the files
+\ No newline at end of file
+diff --git a/ex1/proper.py b/ex1/proper.py
+new file mode 100644
+index 0000000..11b1f85
+--- /dev/null
++++ b/ex1/proper.py
+@@ -0,0 +1,56 @@
++import sys
++import time
++import requests
++from urllib.parse import urlparse
++
++# ERROR HANDLING
++# first check if we have the proper number of arguments
++if len(sys.argv) != 3:
++    print('Invalid number of arguments. Prober must execute with 2 arguments.')
++    print('1st Argument: Test site URL, 2nd Argument: file to be written to')
++    sys.exit(1)
++# parse the url
++p = urlparse(sys.argv[1])
++if p.scheme != 'http' and p.scheme != 'https':
++    print('InvalidArgument: first argument must be a properly formatted URL, should start with "http://" or "https://"')
++    sys.exit(1)
++if p.port != 80 and p.port is not None:
++    print('InvalidPort: Must use default port of 80')
++    sys.exit(1)
++
++# assign our variables and create the sample file if it doesn't exist
++url = sys.argv[1]
++filepath = sys.argv[2]
++file = open(filepath, 'w+')
++# write the url we're using in the header
++file.write('URL=' + url + '\n\n')
++while True:
++    # record the time just before the request and cast as int
++    startTime = round(time.time())
++    # GET request to url specified
++    try:
++        print('making request to ' + url)
++        r = requests.get(url, timeout=30.0)
++        print("request successful, writing to " + filepath)
++        # write truncated UNIX time along with the received status code
++        file.write(str(round(time.time())) + ', ' + str(r.status_code) + '\n')
++    except requests.exceptions.Timeout:
++        # catch timeout exception, write time with -1 code and reattempt
++        print('connection timeout')
++        file.write(str(round(time.time())) + ', -1\n')
++    except requests.exceptions.TooManyRedirects:
++        # catch redirect loop, write time with -1 code and reattempt
++        print("Max number of redirects reached")
++        file.write(str(round(time.time())) + ', -1\n')
++    except requests.exceptions.ConnectionError:
++        # catch errors such as DNS errors, or any other connection problems, write -1 and reattempt
++        print('Failed to connect to server')
++        file.write(str(round(time.time())) + ', -1\n')
++    except requests.exceptions.RequestException:
++        # if request was bad program aborts
++        print('Request Exception, likely a bad url')
++        file.write(str(round(time.time())) + ', -1\n')
++    # record time after request was made
++    endTime = round(time.time())
++    # sleep for 30 seconds minus the amount of time it took to execute
++    time.sleep(30 - (endTime - startTime))
